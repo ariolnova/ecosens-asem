@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Карта качества воздуха | EcoSens</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F0F9F1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            padding: 16px 24px;
+            background: white;
+            border-bottom: 1px solid rgba(165, 214, 167, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2E7D32;
+            text-decoration: none;
+        }
+        .nav {
+            display: flex;
+            gap: 24px;
+        }
+        .nav a {
+            text-decoration: none;
+            color: #1B5E20;
+            font-weight: 500;
+        }
+        .nav a:hover {
+            color: #2E7D32;
+        }
+        .btn-outline {
+            padding: 8px 20px;
+            border: 2px solid #A5D6A7;
+            border-radius: 40px;
+            color: #2E7D32;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .map-container {
+            flex: 1;
+            width: 100%;
+            position: relative;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            background: white;
+            border-radius: 32px;
+            padding: 16px 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            z-index: 10;
+            border: 1px solid #E0F2E1;
+            max-width: 260px;
+        }
+        .legend h4 {
+            font-size: 16px;
+            color: #1B5E20;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #424242;
+        }
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .legend-color.green { background: #4CAF50; }
+        .legend-color.yellow { background: #FFC107; }
+        .legend-color.orange { background: #FF9800; }
+        .legend-color.red { background: #F44336; }
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 40px;
+            padding: 12px 24px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            z-index: 10;
+            font-weight: 500;
+            color: #2E7D32;
+            border: 1px solid #C8E6C9;
+        }
+        @media (max-width: 600px) {
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .legend {
+                bottom: 20px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+            }
+            .info-panel {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=ff0f2805-5fa6-4149-a53a-8a3dfd705f6c&lang=ru_RU" type="text/javascript"></script>
+</head>
+<body>
+    <header>
+        <a href="/" class="logo">EcoSens</a>
+        <nav class="nav">
+            <a href="/">Главная</a>
+            <a href="/map.html" style="color: #2E7D32; font-weight: 600;">Карта</a>
+            <a href="/for-home.html">Для дома</a>
+            <a href="/for-business.html">Для бизнеса</a>
+            <a href="/add-module.html">Добавить модуль</a>
+        </nav>
+        <a href="/add-module.html" class="btn-outline">Добавить модуль</a>
+    </header>
+
+    <div class="map-container">
+        <div id="map"></div>
+        <div class="legend">
+            <h4>🌬️ Качество воздуха (PM2.5)</h4>
+            <div class="legend-item"><div class="legend-color green"></div><span>Хорошее (&lt;12)</span></div>
+            <div class="legend-item"><div class="legend-color yellow"></div><span>Среднее (12–35)</span></div>
+            <div class="legend-item"><div class="legend-color orange"></div><span>Высокое (35–55)</span></div>
+            <div class="legend-item"><div class="legend-color red"></div><span>Опасное (&gt;55)</span></div>
+        </div>
+        <div class="info-panel" id="station-counter">Загрузка станций...</div>
+    </div>
+
+    <script>
+        function getColorByPM(pm25) {
+            if (pm25 < 12) return '#4CAF50';
+            if (pm25 < 35) return '#FFC107';
+            if (pm25 < 55) return '#FF9800';
+            return '#F44336';
+        }
+
+        function formatBalloonContent(station) {
+            return `
+                <div style="font-family: 'Inter', sans-serif; padding: 8px; max-width: 280px;">
+                    <h3 style="margin: 0 0 10px 0; color: #1B5E20; font-size: 18px;">${station.location_text || 'Станция'}</h3>
+                    ${station.owner_email ? `<p style="font-size: 12px; color: #757575;">Владелец: ${station.owner_email}</p>` : ''}
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <tr><td>🌫️ PM2.5</td><td style="font-weight:600; color:${getColorByPM(station.pm25)}">${station.pm25} µg/m³</td></tr>
+                        <tr><td>🌫️ PM10</td><td style="font-weight:600;">${station.pm10} µg/m³</td></tr>
+                        <tr><td>🧪 TVOC</td><td style="font-weight:600;">${station.tvoc} ppb</td></tr>
+                        <tr><td>🌡️ Температура</td><td style="font-weight:600;">${station.temperature}°C</td></tr>
+                        <tr><td>💧 Влажность</td><td style="font-weight:600;">${station.humidity}%</td></tr>
+                        <tr><td>📊 Давление</td><td style="font-weight:600;">${station.pressure} гПа</td></tr>
+                        <tr><td>🕒 Обновлено</td><td style="color:#757575;">${new Date(station.measured_at).toLocaleString()}</td></tr>
+                    </table>
+                </div>
+            `;
+        }
+
+        ymaps.ready(function () {
+            var map = new ymaps.Map('map', {
+                center: [54.5378, 52.7895], // центр на Бугульме
+                zoom: 12,
+                controls: ['zoomControl', 'fullscreenControl', 'geolocationControl']
+            });
+
+            fetch('/api/latest-measurements')
+                .then(res => res.json())
+                .then(stations => {
+                    document.getElementById('station-counter').innerText = `🟢 Активных станций: ${stations.length}`;
+
+                    stations.forEach(station => {
+                        var placemark = new ymaps.Placemark(
+                            [station.lat, station.lon],
+                            {
+                                balloonContent: formatBalloonContent(station),
+                                hintContent: `${station.location_text || 'Модуль'} — PM2.5: ${station.pm25} µg/m³`
+                            },
+                            {
+                                preset: 'islands#circleIcon',
+                                iconColor: getColorByPM(station.pm25)
+                            }
+                        );
+                        map.geoObjects.add(placemark);
+                    });
+                })
+                .catch(err => {
+                    console.error('Failed to load stations:', err);
+                    document.getElementById('station-counter').innerText = '❌ Ошибка загрузки';
+                });
+        });
+    </script>
+</body>
+</html>

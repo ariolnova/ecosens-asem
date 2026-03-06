@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Добавить модуль | EcoSens</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=YOUR_API_KEY&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #F0F9F1;
+            color: #1B5E20;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+        header {
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(165,214,167,0.3);
+            background: white;
+        }
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2E7D32;
+            text-decoration: none;
+        }
+        .nav {
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+        .nav a {
+            text-decoration: none;
+            color: #1B5E20;
+            font-weight: 500;
+        }
+        .nav a:hover {
+            color: #2E7D32;
+        }
+        h1 {
+            font-size: 36px;
+            margin: 40px 0 20px;
+        }
+        .form-card {
+            background: white;
+            border-radius: 32px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(46,125,50,0.1);
+            margin-bottom: 40px;
+        }
+        .form-group {
+            margin-bottom: 24px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1B5E20;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #C8E6C9;
+            border-radius: 16px;
+            font-size: 16px;
+            transition: 0.2s;
+        }
+        input:focus, textarea:focus {
+            border-color: #2E7D32;
+            outline: none;
+        }
+        .map-select {
+            height: 300px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+        .coords-hint {
+            font-size: 14px;
+            color: #2E7D32;
+            margin: 8px 0;
+        }
+        .btn {
+            background: #2E7D32;
+            color: white;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn:hover {
+            background: #1B5E20;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 16px;
+            display: none;
+        }
+        .success {
+            background: #C8E6C9;
+            color: #1B5E20;
+            display: block;
+        }
+        .error {
+            background: #FFCDD2;
+            color: #B71C1C;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-inner">
+            <a href="/" class="logo">EcoSens</a>
+            <nav class="nav">
+                <a href="/">Главная</a>
+                <a href="/map.html">Карта</a>
+                <a href="/for-home.html">Для дома</a>
+                <a href="/for-business.html">Для бизнеса</a>
+                <a href="/add-module.html">Добавить модуль</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>Добавьте ваш модуль на карту</h1>
+        <div class="form-card">
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="station_id">ID модуля *</label>
+                    <input type="text" id="station_id" name="station_id" required placeholder="Например: station_timeryanova_54">
+                    <small style="color:#757575;">ID указан на корпусе или в документации модуля.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="owner_email">Ваш email *</label>
+                    <input type="email" id="owner_email" name="owner_email" required placeholder="Для связи и подтверждения">
+                </div>
+
+                <div class="form-group">
+                    <label for="location_text">Описание места</label>
+                    <textarea id="location_text" name="location_text" rows="2" placeholder="Например: балкон, ул. Ленина 5"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Выберите местоположение на карте *</label>
+                    <div id="map" class="map-select"></div>
+                    <div class="coords-hint" id="coordsDisplay">Координаты не выбраны</div>
+                </div>
+
+                <input type="hidden" id="lat" name="lat">
+                <input type="hidden" id="lon" name="lon">
+
+                <button type="submit" class="btn">Зарегистрировать модуль</button>
+            </form>
+            <div id="message" class="message"></div>
+        </div>
+    </main>
+
+    <script>
+        let map, placemark;
+
+        ymaps.ready(function () {
+            map = new ymaps.Map('map', {
+                center: [54.5378, 52.7895],
+                zoom: 12,
+                controls: ['zoomControl']
+            });
+
+            map.events.add('click', function (e) {
+                const coords = e.get('coords');
+                updateCoords(coords);
+            });
+        });
+
+        function updateCoords(coords) {
+            document.getElementById('lat').value = coords[0].toFixed(6);
+            document.getElementById('lon').value = coords[1].toFixed(6);
+            document.getElementById('coordsDisplay').innerText = `Широта: ${coords[0].toFixed(6)}, Долгота: ${coords[1].toFixed(6)}`;
+
+            if (placemark) {
+                map.geoObjects.remove(placemark);
+            }
+            placemark = new ymaps.Placemark(coords, {}, { preset: 'islands#greenDotIcon' });
+            map.geoObjects.add(placemark);
+        }
+
+        document.getElementById('registerForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const formData = {
+                station_id: document.getElementById('station_id').value.trim(),
+                owner_email: document.getElementById('owner_email').value.trim(),
+                location_text: document.getElementById('location_text').value.trim(),
+                lat: parseFloat(document.getElementById('lat').value),
+                lon: parseFloat(document.getElementById('lon').value)
+            };
+
+            if (!formData.lat || !formData.lon) {
+                alert('Пожалуйста, выберите местоположение на карте');
+                return;
+            }
+
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = 'message';
+            messageDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/register-module', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    messageDiv.className = 'message success';
+                    messageDiv.innerText = 'Модуль успешно зарегистрирован! Скоро он появится на карте.';
+                    messageDiv.style.display = 'block';
+                    document.getElementById('registerForm').reset();
+                    if (placemark) map.geoObjects.remove(placemark);
+                    document.getElementById('coordsDisplay').innerText = 'Координаты не выбраны';
+                } else {
+                    throw new Error(result.error || 'Ошибка регистрации');
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.innerText = 'Ошибка: ' + error.message;
+                messageDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
